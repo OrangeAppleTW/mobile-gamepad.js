@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MobileGamepad Demo</title>
+    <!-- <link rel="stylesheet" href="style.css"> -->
+    <style>
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+/* Adjust body for centering */
+body {
+    display: flex; /* Use flex to help center content */
+    flex-direction: column; /* Stack children vertically */
+    align-items: center; /* Center children horizontally */
+    min-height: 100vh; /* Ensure body takes full height */
+    margin: 0;
+    padding: 15px;
+    background-color: #f0f0f0;
+    font-family: sans-serif;
+}
+
+h1, p, ul {
+    text-align: center; /* Center introductory text */
+    max-width: 600px; /* Limit width of text for readability */
+    margin-left: auto;
+    margin-right: auto;
+}
+
+ul {
+    list-style: none; /* Remove default list bullets */
+    padding: 0;
+}
+
+/* Remove or comment out the .container rule */
+/*
+.container {
+    width: 100%;
+    max-width: 1000px;
+    margin: 20px auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+*/
+
+/* Adjust container styles for block display and centering */
+.iframe-container, .canvas-container {
+    position: relative;
+    display: block; /* Change to block */
+    width: 100%;
+    max-width: 480px;
+    margin-left: auto; /* Center horizontally */
+    margin-right: auto; /* Center horizontally */
+    margin-bottom: 20px; /* Add space below each item */
+    /* vertical-align: top; - Not needed for block */
+}
+
+/* Keep iframe aspect ratio styles */
+.iframe-container {
+    /* height: 400px; */
+    overflow: hidden;
+    /* margin-bottom is already set above */
+}
+#scratchFrame {
+    width: 480px;
+    max-width: 100%;
+    height: 400px;
+}
+
+/* Responsive canvas */
+.canvas-container {
+    /* Height will be determined by the canvas element itself or specific CSS */
+    /* height: auto; */ /* Allow height to adjust - Removed */
+    height: 360px; /* Set explicit height like original design */
+    /* Ensure max-width is still respected */
+    max-width: 480px; /* Keep this from previous step */
+    width: 100%; /* Keep this */
+    position: relative; /* Keep this */
+}
+
+#gameCanvas {
+    display: block; /* Remove extra space below */
+    width: 480px;
+    max-width: 100%;
+    height: 360px;
+    border: 1px solid #ccc;
+    background-color: white;
+    object-fit: contain; /* Ensure canvas content scales correctly if aspect ratio differs */
+}
+
+
+/* Overlay styles remain mostly the same */
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 50px;
+    text-align: center;
+    cursor: pointer;
+    z-index: 10;
+    user-select: none;
+    border-radius: 5px; /* Optional: slightly rounded corners */
+}
+
+/* Media query - maybe adjust margins/padding */
+@media (max-width: 600px) {
+    body {
+        padding: 10px; /* Reduce padding slightly */
+    }
+    h1 {
+        font-size: 1.5em; /* Adjust heading size */
+    }
+    /* Keep container margin-bottom */
+    .iframe-container, .canvas-container {
+        margin-bottom: 15px; /* Slightly reduce gap on mobile */
+    }
+    .overlay {
+        font-size: 40px; /* Reduce overlay icon size */
+    }
+}
+    </style>
+</head>
+<body>
+    <h1>MobileGamepad 展示頁面</h1>
+    <p>點擊下方任一區域的 ▶ 符號，即可為該區域啟用 MobileGamepad 虛擬控制器：</p>
+    <ul>
+        <li>左側區域：嵌入式 Scratch 專案。</li>
+        <li>右側區域：本地 Canvas 元素。</li>
+    </ul>
+
+    <!-- 主內容容器 - 移除 -->
+    <!-- <div class="container"> -->
+        <!-- Scratch iframe 容器 -->
+        <div class="iframe-container">
+            <iframe id="scratchFrame" src="https://scratch.mit.edu/projects/embed/1165000390/" frameborder="0" scrolling="no" allowtransparency="true" allowfullscreen="true"></iframe>
+            <!-- iframe 覆蓋層 -->
+            <div id="scratchOverlay" class="overlay">&#9654;</div>
+        </div>
+
+        <!-- 本地 Canvas 容器 -->
+        <div class="canvas-container">
+            <canvas id="gameCanvas"></canvas> <!-- 移除 width, height 和 style -->
+            <!-- Canvas 覆蓋層 -->
+            <div id="canvasOverlay" class="overlay">&#9654;</div>
+        </div>
+    <!-- </div> -->
+    <!-- <br> --> <!-- 移除不必要的換行符 -->
+
+    <!-- 綁定本地 Canvas 的按鈕 -->
+    <!-- <button id="bindCanvasButton" style="margin-top: 15px;">綁定 Canvas 觸控</button> --> <!-- 移除按鈕 -->
+
+    <script src="mobile-gamepad.js"></script>
+    <!-- <script src="script.js"></script> -->
+    <script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const canvasWidth = canvas.width;
+const canvasHeight = canvas.height;
+
+const gridSize = 20; // 每次移動的格數大小
+const playerSize = gridSize;
+let playerX = Math.floor(canvasWidth / 2 / gridSize) * gridSize; // 初始位置置中於某個格子上
+let playerY = Math.floor(canvasHeight / 2 / gridSize) * gridSize;
+const playerColor = 'black';
+
+let isAccelerating = false; // 是否按著空白鍵
+
+// 繪製玩家方塊
+function drawPlayer() {
+    ctx.fillStyle = playerColor;
+    ctx.fillRect(playerX, playerY, playerSize, playerSize);
+}
+
+// 清除畫布
+function clearCanvas() {
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    // 因為 CSS 已將 canvas 背景設為白色，這裡不需要再填滿背景色
+}
+
+// 遊戲主循環（只在需要時調用）
+function gameLoop() {
+    clearCanvas();
+    drawPlayer();
+}
+
+// 處理按鍵按下事件
+function handleKeyDown(event) {
+    let moved = false;
+    // 如果正在加速，移動距離是 3 格，否則為 1 格
+    const currentStep = gridSize * (isAccelerating ? 3 : 1);
+
+    switch(event.key) {
+        case 'ArrowUp':
+            // 檢查是否會超出上邊界
+            if (playerY - currentStep >= 0) {
+                playerY -= currentStep;
+                moved = true;
+            }
+            event.preventDefault();
+            break;
+        case 'ArrowDown':
+            // 檢查是否會超出下邊界
+            if (playerY + playerSize + currentStep <= canvasHeight) {
+                playerY += currentStep;
+                moved = true;
+            }
+            event.preventDefault();
+            break;
+        case 'ArrowLeft':
+            // 檢查是否會超出左邊界
+            if (playerX - currentStep >= 0) {
+                playerX -= currentStep;
+                moved = true;
+            }
+            event.preventDefault();
+            break;
+        case 'ArrowRight':
+            // 檢查是否會超出右邊界
+            if (playerX + playerSize + currentStep <= canvasWidth) {
+                playerX += currentStep;
+                moved = true;
+            }
+            event.preventDefault();
+            break;
+        case ' ': // 空白鍵
+            if (!isAccelerating) { // 避免重複觸發
+                isAccelerating = true;
+                // console.log('Accelerating ON'); // 調試用
+            }
+            event.preventDefault();
+            break;
+        // 其他按鍵 (W, A, S, D 等) 通常沒有影響頁面捲動的預設行為
+        // 但如果需要確保它們也只用於遊戲控制，也可以加上 preventDefault
+        case 'W':
+        case 'A':
+        case 'S':
+        case 'D':
+        case 'G':
+        case 'H':
+        case 'J':
+        case 'C':
+            // 這裡可以添加這些按鍵的遊戲邏輯
+            // 如果這些按鍵在瀏覽器中可能有其他預設行為 (雖然不太可能)
+            // 也可以加上 event.preventDefault();
+            console.log(`Action key pressed: ${event.key}`);
+            event.preventDefault(); // 為確保一致性，也阻止潛在的預設行為
+            break;
+    }
+
+    // 只有方向鍵移動時才重繪
+    if (moved) {
+        gameLoop();
+    }
+}
+
+// 處理按鍵放開事件
+function handleKeyUp(event) {
+    if (event.key === ' ') { // 空白鍵
+        isAccelerating = false;
+        // console.log('Accelerating OFF'); // 調試用
+    }
+}
+
+// 監聽鍵盤事件 (修改：監聽 canvas 而非 window)
+// window.addEventListener('keydown', handleKeyDown);
+// window.addEventListener('keyup', handleKeyUp);
+canvas.addEventListener('keydown', handleKeyDown);
+canvas.addEventListener('keyup', handleKeyUp);
+
+// 初始繪製
+gameLoop();
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            // 獲取元素
+            const canvas = document.getElementById('gameCanvas');
+            const canvasOverlay = document.getElementById('canvasOverlay'); // 新增：獲取 canvas 覆蓋層
+            // const bindCanvasButton = document.getElementById('bindCanvasButton'); // 移除：不再需要按鈕
+            const scratchFrame = document.getElementById('scratchFrame');
+            const scratchOverlay = document.getElementById('scratchOverlay');
+
+            const keysToBind = [
+                 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ',
+                 'W', 'A', 'S', 'D', 'G', 'H', 'J', 'C'
+            ];
+
+            // --- 點擊 Canvas Overlay 的邏輯 ---
+            if (canvasOverlay && canvas && typeof MobileGamepad !== 'undefined') {
+                canvasOverlay.addEventListener('click', () => {
+                    console.log('偵測到 Canvas overlay 點擊，嘗試啟用 Canvas 控制...');
+                    try {
+                        const canvasGamepad = new MobileGamepad(canvas, keysToBind);
+                        canvasGamepad.bind();
+                        canvas.focus(); // 聚焦 Canvas 以接收鍵盤事件
+                        console.log('MobileGamepad 已綁定到本地 Canvas 並已聚焦。');
+
+                        // 新增: 監聽 unbind 事件以重新顯示 overlay
+                        canvasGamepad.on('unbind', () => {
+                            console.log('Canvas gamepad 已解除綁定，重新顯示 overlay。');
+                            canvasOverlay.style.display = 'flex'; // 使用 flex 以便垂直居中
+                        });
+
+                        // 隱藏 overlay
+                        canvasOverlay.style.display = 'none';
+                        console.log('Canvas overlay 已隱藏。');
+                    } catch (e) {
+                        console.error('處理 Canvas overlay 點擊時出錯:', e);
+                    }
+                });
+            } else {
+                console.error('無法初始化本地 Canvas 的 MobileGamepad 相關功能：缺少元素或函式庫。');
+            }
+
+            // --- 點擊 Scratch Overlay 的邏輯 ---
+            if (scratchOverlay && scratchFrame && typeof MobileGamepad !== 'undefined') {
+                 scratchOverlay.addEventListener('click', () => {
+                     console.log('偵測到 Scratch overlay 點擊，嘗試啟用 iframe 控制...');
+                     try {
+                         const iframeGamepad = new MobileGamepad(scratchFrame, keysToBind);
+                         iframeGamepad.bind();
+                         console.log('MobileGamepad 已綁定到 Scratch iframe。');
+
+                        // 新增: 監聽 unbind 事件以重新顯示 overlay
+                        iframeGamepad.on('unbind', () => {
+                            console.log('Scratch gamepad 已解除綁定，重新顯示 overlay。');
+                            scratchOverlay.style.display = 'flex'; // 使用 flex 以便垂直居中
+                        });
+
+                         try {
+                            scratchFrame.contentWindow.focus();
+                            console.log('已嘗試聚焦 Scratch iframe。');
+                         } catch (focusError) {
+                             console.warn('聚焦 iframe 時發生錯誤 (可能是跨來源限制，但仍會嘗試綁定):', focusError);
+                         }
+
+                         // 隱藏 overlay
+                         scratchOverlay.style.display = 'none';
+                         console.log('Scratch overlay 已隱藏。');
+
+                     } catch (e) {
+                         console.error('處理 Scratch overlay 點擊時出錯:', e);
+                     }
+                 });
+            } else {
+                 console.error('無法初始化 Scratch iframe 的 MobileGamepad 相關功能：缺少元素或函式庫。');
+            }
+        });
+    </script>
+</body>
+</html> 
