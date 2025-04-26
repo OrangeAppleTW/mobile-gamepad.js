@@ -68,7 +68,7 @@ ul {
 #scratchFrame {
     width: 480px;
     max-width: 100%;
-    height: 400px;
+    height: 360px;
 }
 
 /* Responsive canvas */
@@ -86,7 +86,7 @@ ul {
     display: block; /* Remove extra space below */
     width: 480px;
     max-width: 100%;
-    height: 360px;
+    /* height: 360px; */
     border: 1px solid #ccc;
     background-color: white;
     object-fit: contain; /* Ensure canvas content scales correctly if aspect ratio differs */
@@ -150,7 +150,7 @@ ul {
 
         <!-- 本地 Canvas 容器 -->
         <div class="canvas-container">
-            <canvas id="gameCanvas"></canvas> <!-- 移除 width, height 和 style -->
+            <canvas id="gameCanvas" width="480" height="360"></canvas> <!-- 移除 width, height 和 style -->
             <!-- Canvas 覆蓋層 -->
             <div id="canvasOverlay" class="overlay">&#9654;</div>
         </div>

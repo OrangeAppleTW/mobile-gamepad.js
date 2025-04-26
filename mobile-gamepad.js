@@ -23,9 +23,9 @@ class MobileGamepad {
 
         // --- 內部樣式定義 (調整佈局) ---
         this.styles = {
-            overlay: `position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.7); z-index: 9990; display: flex; flex-direction: column; justify-content: flex-end; /* 內容靠下 */ align-items: center; padding-bottom: 20px; /* 增加底部空間 */ box-sizing: border-box; pointer-events: none; /* Overlay 本身不攔截事件 */`,
+            overlay: `position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background-color: rgba(0, 0, 0, 0.7); z-index: 9990; display: flex; flex-direction: column; justify-content: flex-start; /* 改為靠上 */ align-items: center; padding-top: 100px; /* 增加頂部空間 */ padding-bottom: 20px; /* 保留底部空間 */ box-sizing: border-box; pointer-events: none; /* Overlay 本身不攔截事件 */`,
             // 新增: targetWrapper 樣式 (取代舊的 canvasWrapper)
-            targetWrapper: `position: relative; display: flex; justify-content: center; align-items: center; width: 100%; max-width: 100vw; flex-grow: 1; /* 佔據上方空間 */ margin-bottom: 150px; /* 為所有按鈕留出足夠空間 */ pointer-events: auto; /* 允許與目標元素交互 */`,
+            targetWrapper: `position: relative; display: flex; justify-content: center; align-items: flex-start; /* 改為頂部對齊 */ width: 100%; max-width: 100vw; flex-grow: 1; /* 佔據下方空間 */ margin-bottom: 150px; /* 為所有按鈕留出足夠空間 */ pointer-events: auto; /* 允許與目標元素交互 */`,
             closeButton: `position: absolute; top: 15px; right: 15px; width: 30px; height: 30px; background-color: rgba(255, 255, 255, 0.8); color: black; border: none; border-radius: 50%; font-size: 18px; font-weight: bold; line-height: 1; /* 調整 line-height */ text-align: center; cursor: pointer; z-index: 9999; user-select: none; display: flex; justify-content: center; align-items: center; box-sizing: border-box; pointer-events: auto;`,
             // --- D-Pad (絕對定位, 靠左, 稍高) ---
             dpadContainer: `display: grid; grid-template-areas: '. up .' 'left . right' '. down .'; gap: 5px; /* 减少间隙 */ width: 150px; /* 增加整体宽度 */ height: 150px; /* 增加整体高度 */ position: absolute; left: 20px; bottom: 80px; /* 向上移動 */ z-index: 9998; pointer-events: auto;`,
@@ -215,11 +215,37 @@ class MobileGamepad {
         // 儲存原始父節點和兄弟節點
         this.originalStyles.parent = this.targetElement.parentNode;
         this.originalStyles.nextSibling = this.targetElement.nextSibling;
-        // 儲存原始 display 樣式 (以防萬一 flex 佈局改變它)
+        // 儲存原始 display 和尺寸相關樣式
         this.originalStyles.display = this.targetElement.style.display;
+        this.originalStyles.width = this.targetElement.style.width;
+        this.originalStyles.height = this.targetElement.style.height;
+        this.originalStyles.maxWidth = this.targetElement.style.maxWidth;
+        this.originalStyles.maxHeight = this.targetElement.style.maxHeight;
+        this.originalStyles.objectFit = this.targetElement.style.objectFit;
+        this.originalStyles.boxSizing = this.targetElement.style.boxSizing;
 
         // 將 targetElement 移動到 wrapper 中
         this.elements.targetWrapper.appendChild(this.targetElement);
+
+        // 根據元素類型應用不同的樣式
+        if (this.targetElement instanceof HTMLCanvasElement) {
+            // Canvas: 保持比例，寬度填滿，高度自動
+            this.targetElement.style.display = 'block';
+            this.targetElement.style.width = '100%';
+            this.targetElement.style.height = 'auto';
+            this.targetElement.style.maxWidth = '100%';
+            this.targetElement.style.maxHeight = '100%';
+            this.targetElement.style.objectFit = 'contain';
+        } else {
+            // 非 Canvas (e.g., iframe): 寬高設為螢幕寬度 (100vw)
+            this.targetElement.style.display = 'block';
+            this.targetElement.style.width = '100vw';
+            this.targetElement.style.height = '100vw';
+            this.targetElement.style.maxWidth = '100%'; // 限制最大寬度不超出 wrapper
+            this.targetElement.style.maxHeight = '100%'; // 限制最大高度不超出 wrapper
+            this.targetElement.style.objectFit = 'cover'; // 嘗試覆蓋區域
+            this.targetElement.style.boxSizing = 'border-box';
+        }
 
         this.elements.closeButton = this._createDOMElement('button', this.styles.closeButton, 'X');
         this.elements.closeButton.addEventListener('click', () => this.unbind());
@@ -302,8 +328,14 @@ class MobileGamepad {
              console.warn('MobileGamepad: 無法找到原始父節點，嘗試將元素添加回 body。');
             document.body.appendChild(this.targetElement);
         }
-        // 恢復原始 display 樣式
+        // 恢復原始 display 和尺寸樣式
         this.targetElement.style.display = this.originalStyles.display;
+        this.targetElement.style.width = this.originalStyles.width;
+        this.targetElement.style.height = this.originalStyles.height;
+        this.targetElement.style.maxWidth = this.originalStyles.maxWidth;
+        this.targetElement.style.maxHeight = this.originalStyles.maxHeight;
+        this.targetElement.style.objectFit = this.originalStyles.objectFit;
+        this.targetElement.style.boxSizing = this.originalStyles.boxSizing; // 恢復 boxSizing
 
         // 移除 targetWrapper (現在 targetElement 已經被移走)
         if (this.elements.targetWrapper) {
